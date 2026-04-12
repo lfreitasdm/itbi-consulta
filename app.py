@@ -8,6 +8,18 @@ st.set_page_config(layout="wide")
 st.title("📊 Consulta de Transações ITBI")
 
 # =========================
+# FUNÇÃO LIMPEZA NUMÉRICA
+# =========================
+def limpar_numero(coluna):
+    return (
+        coluna.astype(str)
+        .str.replace("R$", "", regex=False)
+        .str.replace(".", "", regex=False)
+        .str.replace(",", ".", regex=False)
+        .str.strip()
+    )
+
+# =========================
 # CARREGAR DADOS
 # =========================
 @st.cache_data(ttl=3600)
@@ -17,7 +29,7 @@ def carregar_dados():
 
         df = pd.read_csv(
             url,
-            sep=";",                # CSV brasileiro
+            sep=";",
             encoding="utf-8",
             on_bad_lines="skip",
             low_memory=False
@@ -40,28 +52,17 @@ def carregar_dados():
         }, inplace=True)
 
         # =========================
-        # TRATAMENTO DE DADOS
+        # LIMPEZA DE DADOS
         # =========================
-# =========================
-# LIMPEZA DE NÚMEROS (BR)
-# =========================
+        df["VALOR"] = pd.to_numeric(limpar_numero(df.get("VALOR")), errors="coerce")
+        df["AREA"] = pd.to_numeric(limpar_numero(df.get("AREA")), errors="coerce")
 
-def limpar_numero(coluna):
-    return (
-        coluna.astype(str)
-        .str.replace("R$", "", regex=False)
-        .str.replace(".", "", regex=False)
-        .str.replace(",", ".", regex=False)
-        .str.strip()
-    )
-
-# Aplicar limpeza
-df["VALOR"] = pd.to_numeric(limpar_numero(df.get("VALOR")), errors="coerce")
-df["AREA"] = pd.to_numeric(limpar_numero(df.get("AREA")), errors="coerce")
-
+        # Criar endereço
         df["ENDERECO"] = df.get("LOGRADOURO", "").astype(str) + ", " + df.get("NUMERO", "").astype(str)
 
-        # Evitar divisão por zero
+        # =========================
+        # CALCULO PREÇO M2
+        # =========================
         df["PRECO_M2"] = df["VALOR"] / df["AREA"]
         df["PRECO_M2"] = df["PRECO_M2"].replace([float("inf"), -float("inf")], None)
 
