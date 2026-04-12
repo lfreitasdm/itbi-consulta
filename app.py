@@ -14,7 +14,7 @@ st.title("📊 Consulta de Transações ITBI")
 def carregar_dados():
     try:
         # 🔗 LINK DIRETO DO SEU SITE
-        url = "http://www.leandrofreitas.com/planilha2025.xlsx"
+        url = "http://www.leandrofreitas.com/planilha2025.csv"
 
         # 👉 Se for CSV (RECOMENDADO)
         df = pd.read_csv(url)
