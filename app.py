@@ -1,4 +1,3 @@
-
 import pandas as pd
 import streamlit as st
 
@@ -16,27 +15,39 @@ def carregar_dados():
     try:
         url = "http://www.leandrofreitas.com/planilha2025.csv"
 
-        # 🔥 Leitura robusta para CSV brasileiro
         df = pd.read_csv(
             url,
-            sep=";",                # separador padrão BR
+            sep=";",                # CSV brasileiro
             encoding="utf-8",
-            on_bad_lines="skip",   # ignora linhas com erro
+            on_bad_lines="skip",
             low_memory=False
         )
 
         # =========================
+        # PADRONIZAR COLUNAS
+        # =========================
+        df.columns = df.columns.str.strip()
+
+        df.rename(columns={
+            "Área Construída (m2)": "AREA",
+            "Área Construída (m²)": "AREA",
+            "Valor de Transação (declarado pelo contribuinte)": "VALOR",
+            "Nome do Logradouro": "LOGRADOURO",
+            "Número": "NUMERO",
+            "Bairro": "BAIRRO",
+            "Data de Transação": "DATA",
+            "Descrição do uso (IPTU)": "TIPO"
+        }, inplace=True)
+
+        # =========================
         # TRATAMENTO DE DADOS
         # =========================
+        df["AREA"] = pd.to_numeric(df.get("AREA"), errors="coerce")
+        df["VALOR"] = pd.to_numeric(df.get("VALOR"), errors="coerce")
 
-        # Converter colunas numéricas
-        df["AREA"] = pd.to_numeric(df["Área Construída (m2)"], errors="coerce")
-        df["VALOR"] = pd.to_numeric(df["Valor de Transação (declarado pelo contribuinte)"], errors="coerce")
+        df["ENDERECO"] = df.get("LOGRADOURO", "").astype(str) + ", " + df.get("NUMERO", "").astype(str)
 
-        # Criar endereço completo
-        df["ENDERECO"] = df["Nome do Logradouro"].astype(str) + ", " + df["Número"].astype(str)
-
-        # 🔥 Evitar divisão por zero
+        # Evitar divisão por zero
         df["PRECO_M2"] = df["VALOR"] / df["AREA"]
         df["PRECO_M2"] = df["PRECO_M2"].replace([float("inf"), -float("inf")], None)
 
@@ -69,9 +80,9 @@ valor_max = st.sidebar.number_input("Valor máximo", value=10000000)
 area_min = st.sidebar.number_input("Área mínima", value=0)
 area_max = st.sidebar.number_input("Área máxima", value=1000)
 
-# Tipo de imóvel (se existir)
-if "Descrição do uso (IPTU)" in df.columns:
-    tipos = ["Todos"] + sorted(df["Descrição do uso (IPTU)"].dropna().unique())
+# Tipo de imóvel
+if "TIPO" in df.columns:
+    tipos = ["Todos"] + sorted(df["TIPO"].dropna().unique())
 else:
     tipos = ["Todos"]
 
@@ -87,24 +98,24 @@ if busca:
         df_filtrado["ENDERECO"].str.contains(busca, case=False, na=False)
     ]
 
-if bairro and "Bairro" in df.columns:
+if bairro and "BAIRRO" in df.columns:
     df_filtrado = df_filtrado[
-        df_filtrado["Bairro"].str.contains(bairro, case=False, na=False)
+        df_filtrado["BAIRRO"].str.contains(bairro, case=False, na=False)
     ]
 
 df_filtrado = df_filtrado[
-    (df_filtrado["VALOR"] >= valor_min) &
-    (df_filtrado["VALOR"] <= valor_max)
+    (df_filtrado["VALOR"].fillna(0) >= valor_min) &
+    (df_filtrado["VALOR"].fillna(0) <= valor_max)
 ]
 
 df_filtrado = df_filtrado[
-    (df_filtrado["AREA"] >= area_min) &
-    (df_filtrado["AREA"] <= area_max)
+    (df_filtrado["AREA"].fillna(0) >= area_min) &
+    (df_filtrado["AREA"].fillna(0) <= area_max)
 ]
 
-if tipo != "Todos" and "Descrição do uso (IPTU)" in df.columns:
+if tipo != "Todos" and "TIPO" in df.columns:
     df_filtrado = df_filtrado[
-        df_filtrado["Descrição do uso (IPTU)"] == tipo
+        df_filtrado["TIPO"] == tipo
     ]
 
 # =========================
@@ -115,9 +126,9 @@ st.subheader("📋 Resultados")
 st.write(f"Total encontrado: {len(df_filtrado)} registros")
 
 colunas = [
-    "Data de Transação" if "Data de Transação" in df.columns else None,
+    "DATA" if "DATA" in df.columns else None,
     "ENDERECO",
-    "Bairro" if "Bairro" in df.columns else None,
+    "BAIRRO" if "BAIRRO" in df.columns else None,
     "VALOR",
     "AREA",
     "PRECO_M2"
