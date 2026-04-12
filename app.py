@@ -1,7 +1,7 @@
 @st.cache_data
 def carregar_dados():
     try:
-        url = "https://drive.google.com/uc?export=download&id=1BRXf7PHISpJaTUCVuEsVwabjc70bxPTj"
+        url = "http://www.leandrofreitas.com/planilha2025.xlsx"
         
         df = pd.read_excel(url, sheet_name=None)
         df = pd.concat(df.values(), ignore_index=True)
