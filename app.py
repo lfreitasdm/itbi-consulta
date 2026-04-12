@@ -42,8 +42,22 @@ def carregar_dados():
         # =========================
         # TRATAMENTO DE DADOS
         # =========================
-        df["AREA"] = pd.to_numeric(df.get("AREA"), errors="coerce")
-        df["VALOR"] = pd.to_numeric(df.get("VALOR"), errors="coerce")
+# =========================
+# LIMPEZA DE NÚMEROS (BR)
+# =========================
+
+def limpar_numero(coluna):
+    return (
+        coluna.astype(str)
+        .str.replace("R$", "", regex=False)
+        .str.replace(".", "", regex=False)
+        .str.replace(",", ".", regex=False)
+        .str.strip()
+    )
+
+# Aplicar limpeza
+df["VALOR"] = pd.to_numeric(limpar_numero(df.get("VALOR")), errors="coerce")
+df["AREA"] = pd.to_numeric(limpar_numero(df.get("AREA")), errors="coerce")
 
         df["ENDERECO"] = df.get("LOGRADOURO", "").astype(str) + ", " + df.get("NUMERO", "").astype(str)
 
