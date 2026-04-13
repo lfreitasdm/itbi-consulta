@@ -1,8 +1,14 @@
 import pandas as pd
 import streamlit as st
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet
+import tempfile
 
+# =========================
+# CONFIGURAÇÃO
+# =========================
 st.set_page_config(layout="wide")
-st.title("📊 Consulta Inteligente ITBI")
+st.title("📊 Consulta Inteligente ITBI + Laudo")
 
 # =========================
 # LIMPEZA NUMÉRICA
@@ -23,7 +29,13 @@ def limpar_numero(coluna):
 def carregar_dados():
     url = "http://www.leandrofreitas.com/planilha2025.csv"
 
-    df = pd.read_csv(url, sep=";", encoding="utf-8", on_bad_lines="skip", low_memory=False)
+    df = pd.read_csv(
+        url,
+        sep=";",
+        encoding="utf-8",
+        on_bad_lines="skip",
+        low_memory=False
+    )
 
     df.columns = df.columns.str.strip()
 
@@ -48,6 +60,57 @@ def carregar_dados():
 
     return df
 
+# =========================
+# GERAR LAUDO TEXTO
+# =========================
+def gerar_laudo(df_filtrado, valor_input=None, area_input=None):
+    media = df_filtrado["PRECO_M2"].mean()
+    mediana = df_filtrado["PRECO_M2"].median()
+    total = len(df_filtrado)
+
+    texto = f"""
+Estudo de Mercado Imobiliário
+
+Foram analisadas {total} transações reais registradas via ITBI.
+
+O valor médio do metro quadrado na região é de R$ {media:,.0f},
+enquanto a mediana está em R$ {mediana:,.0f}.
+"""
+
+    if valor_input and area_input and area_input > 0:
+        preco_m2 = valor_input / area_input
+
+        if preco_m2 < media * 0.9:
+            texto += "\nO imóvel está abaixo do valor médio de mercado, indicando potencial de valorização."
+        elif preco_m2 > media * 1.1:
+            texto += "\nO imóvel está acima da média da região, podendo ter maior tempo de venda."
+        else:
+            texto += "\nO imóvel está dentro da média praticada na região."
+
+    return texto
+
+# =========================
+# GERAR PDF
+# =========================
+def gerar_pdf(texto):
+    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
+
+    doc = SimpleDocTemplate(temp_file.name)
+    styles = getSampleStyleSheet()
+
+    content = []
+
+    for linha in texto.split("\n"):
+        content.append(Paragraph(linha, styles["Normal"]))
+        content.append(Spacer(1, 10))
+
+    doc.build(content)
+
+    return temp_file.name
+
+# =========================
+# EXECUÇÃO
+# =========================
 df = carregar_dados()
 
 # =========================
@@ -60,27 +123,24 @@ bairro = st.sidebar.text_input("Bairro")
 df_filtrado = df.copy()
 
 if bairro:
-    df_filtrado = df_filtrado[df_filtrado["BAIRRO"].str.contains(bairro, case=False, na=False)]
+    df_filtrado = df_filtrado[
+        df_filtrado["BAIRRO"].str.contains(bairro, case=False, na=False)
+    ]
 
 # =========================
-# 📊 MÉTRICAS
+# MÉTRICAS
 # =========================
 st.subheader("📊 Indicadores de Mercado")
 
 col1, col2, col3, col4 = st.columns(4)
 
-media_valor = df_filtrado["VALOR"].mean()
-mediana_valor = df_filtrado["VALOR"].median()
-media_m2 = df_filtrado["PRECO_M2"].mean()
-total = len(df_filtrado)
-
-col1.metric("💰 Média", f"R$ {media_valor:,.0f}")
-col2.metric("📉 Mediana", f"R$ {mediana_valor:,.0f}")
-col3.metric("📐 Média m²", f"R$ {media_m2:,.0f}")
-col4.metric("📊 Total vendas", total)
+col1.metric("💰 Média", f"R$ {df_filtrado['VALOR'].mean():,.0f}")
+col2.metric("📉 Mediana", f"R$ {df_filtrado['VALOR'].median():,.0f}")
+col3.metric("📐 Média m²", f"R$ {df_filtrado['PRECO_M2'].mean():,.0f}")
+col4.metric("📊 Total vendas", len(df_filtrado))
 
 # =========================
-# 📍 ANÁLISE POR BAIRRO
+# RANKING
 # =========================
 st.subheader("📍 Ranking de Bairros")
 
@@ -94,7 +154,7 @@ ranking = (
 st.bar_chart(ranking)
 
 # =========================
-# 🧠 COMPARADOR DE IMÓVEL
+# COMPARADOR
 # =========================
 st.subheader("🧠 Comparar Imóvel")
 
@@ -111,14 +171,33 @@ if area_input > 0:
     st.write(f"Média da região: R$ {media_mercado:,.0f}")
 
     if preco_m2_input < media_mercado * 0.9:
-        st.success("🟢 Abaixo do mercado (boa oportunidade)")
+        st.success("🟢 Abaixo do mercado")
     elif preco_m2_input > media_mercado * 1.1:
         st.error("🔴 Acima do mercado")
     else:
         st.warning("🟡 Dentro da média")
 
 # =========================
-# 📋 TABELA
+# LAUDO + PDF
+# =========================
+st.subheader("📄 Gerar Laudo de Mercado")
+
+if st.button("Gerar Laudo"):
+    laudo = gerar_laudo(df_filtrado, valor_input, area_input)
+
+    st.text_area("Laudo gerado:", laudo, height=300)
+
+    pdf_path = gerar_pdf(laudo)
+
+    with open(pdf_path, "rb") as f:
+        st.download_button(
+            "📥 Baixar PDF",
+            f,
+            file_name="laudo_mercado.pdf"
+        )
+
+# =========================
+# TABELA
 # =========================
 st.subheader("📋 Dados")
 
